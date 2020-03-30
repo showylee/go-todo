@@ -4,9 +4,9 @@
     <button v-on:click="addItem">add</button>
     <div>
       <p v-for="(item, index) in items" v-bind:key="index" >
-        {{ item.item }}
-        <button v-on:click="deleteItem">delete</button>
-        <button>update</button>
+        {{ item }}
+        <button v-on:click="deleteItem" disabled>delete</button>
+        <button disabled>update</button>
       </p>
     </div>
   </div>
@@ -31,7 +31,7 @@ export default {
       .get('http://localhost:8888/api/v1/todo')
       .then(response => {
         this.items = response.data
-        alert(JSON.stringify(response))
+        alert(JSON.stringify(response.data))
       }).catch(error => alert(error))
   },
   methods: {
@@ -41,8 +41,8 @@ export default {
           item: this.item
         })
         .then(response => {
-          this.items = response
-          alert(response)
+          this.items = response.data
+          alert(response.data)
         }).catch(error => alert(error))
     },
     deleteItem: function () {

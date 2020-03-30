@@ -5,6 +5,7 @@ import (
   //"gopkg.in/group.v1"
   "log"
   //"strconv"
+  "os"
 
   "github.com/gin-gonic/gin"
   _ "github.com/go-sql-driver/mysql"
@@ -34,16 +35,17 @@ func Cors() gin.HandlerFunc {
   }
 }
 
-type (PostFormat struct {
-  Value string `json:"key"`
-})
+type PostFormat struct {
+  Val string `json:"item"`
+}
 
 type Todo struct{
-  id int
-  user_id int
-  item string
-  delflg bool
+  Id int
+  UserId int
+  Item string
+  Delflg bool
 }
+type TodoList []Todo
 
 func main() {
   r := gin.Default()
@@ -81,24 +83,24 @@ func GetItems(c *gin.Context) {
     panic(err.Error())
   }
 
-  var todoList []Todo
+  logfile, err := os.Create("/go/src/api/log.txt")
+  if err != nil {
+    return
+  }
+  defer logfile.Close()
+
+  var todoList TodoList
   for rows.Next(){
     todo := Todo{}
-    if err := rows.Scan(&todo.id, &todo.user_id, &todo.item, &todo.delflg); err != nil {
+    if err := rows.Scan(&todo.Id, &todo.UserId, &todo.Item, &todo.Delflg); err != nil {
       log.Fatal(err)
     }
-    log.Printf("item: %s", todo.item);
+    logfile.Write(([]byte)(todo.Item))
+    logfile.Write(([]byte)("\n"))
     todoList = append(todoList, todo)
   }
-  log.Printf("items item: %s", todoList[0].item)
 
-  todo := Todo{}
-  todo.id = 0
-  todo.user_id = 0
-  todo.item = "test test"
-  todo.delflg = false
-
-  c.JSON(200, todo)
+  c.JSON(200, todoList)
 }
 
 func GetItem(c *gin.Context) {
@@ -107,33 +109,43 @@ func GetItem(c *gin.Context) {
 
 func AddItem(c *gin.Context) { c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
   var val PostFormat
-  c.Bind(&val)
+  c.BindJSON(&val)
 
-  log.Printf("post: %s", val.Value)
+  logfile, err := os.Create("/go/src/api/log.txt")
+  if err != nil {
+    return
+  }
+  defer logfile.Close()
 
-  //c.Request.ParseForm()
-  //item := c.Request.Form["item"]
+  item := val.Val 
 
-  c.JSON(200, val.Value)
+  db, err := sql.Open("mysql", "root:example@tcp(db:3306)/todo")
+  if err != nil {
+    panic(err.Error())
+  }
+  defer db.Close()
 
-  //db, err := sql.Open("mysql", "root:example@tcp(db:3306)/todo")
-  //if err != nil {
-  //  panic(err.Error())
-  //}
-  //defer db.Close()
+  ins, err := db.Prepare("insert into items(user_id, item, delflg) values(?, ?, ?)")
+  if err != nil {
+    panic(err.Error())
+  }
+  ins.Exec(0, item, false)
 
-  //ins, err := db.Prepare("insert into items(user_id, item, delflg) values(?, ?, ?)")
-  //if err != nil {
-  //  panic(err.Error())
-  //}
-  //ins.Exec(0, item, false)
+  rows, err := db.Query("select item from items")
+  if err != nil {
+    panic(err.Error())
+  }
 
-  //rows, err := db.Query("select item from items")
-  //if err != nil {
-  //  panic(err.Error())
-  //}
+  var res []string
+  for rows.Next() {
+    if err := rows.Scan(&item); err != nil {
+      log.Fatal(err)
+    }
+    logfile.Write(([]byte)(item))
+    res = append(res, item)
+  }
 
-  //c.JSON(200, rows)
+  c.JSON(200, res)
 }
 
 func UpdateItem(c *gin.Context) {
